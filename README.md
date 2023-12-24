@@ -16,7 +16,9 @@ Contributions are welcome! If you have ideas for improvements or new features, f
 
 
 Screenshots:
-[Add Screenshots Here]
+![Tasks](https://raw.githubusercontent.com/ijaspreetsinghh/todolist/main/tasks.jpg)
+![Add Task](https://raw.githubusercontent.com/ijaspreetsinghh/todolist/main/add_task.jpg)
+
 
 ## Getting Started
 
