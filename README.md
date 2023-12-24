@@ -15,7 +15,8 @@ This is a simple and minimalistic to-do list app designed to help you stay organ
 Contributions are welcome! If you have ideas for improvements or new features, feel free to open an issue or submit a pull request. Let's make task management simple and enjoyable together!
 
 
-Screenshots:
+## Screenshots:
+
 ![Tasks](https://raw.githubusercontent.com/ijaspreetsinghh/todolist/main/tasks.jpg)
 ![Add Task](https://raw.githubusercontent.com/ijaspreetsinghh/todolist/main/add_task.jpg)
 
