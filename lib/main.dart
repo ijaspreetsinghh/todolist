@@ -1,3 +1,4 @@
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:todolist/Controllers.dart';
 import 'package:todolist/components/bottolsheetcompoentnts.dart';
 import 'package:todolist/components/preview_bottolsheet.dart';
+import 'package:todolist/notification_controller.dart';
 import 'package:todolist/tasks_model.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
@@ -17,7 +19,7 @@ void main() async {
 
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   TaskController taskController = Get.put(TaskController());
-  runApp(const MyApp());
+
   var databasesPath = await getDatabasesPath();
   database = await openDatabase('$databasesPath/tasks.db', version: 1,
       onCreate: (Database db, int version) async {
@@ -25,35 +27,53 @@ void main() async {
     await db.execute(
         'CREATE TABLE IF NOT EXISTS tasks ( task_id INTEGER PRIMARY KEY, task_name TEXT NOT NULL, due_timestamp TIMESTAMP,remind_timestamp TIMESTAMP, completed BOOLEAN DEFAULT false,strong_reminder BOOLEAN DEFAULT false )');
   });
-
+  // taskController.allTasks.clear();
+  // taskController.overDueTasks.clear();
+  // taskController.comingTasks.clear();
   List<Map> list = await database.rawQuery('SELECT * FROM tasks');
-
   for (var element in list) {
-    print(element);
-    if (!taskController.allTasks.contains(element)) {
-      taskController.allTasks.add(
-        Tasks(
-          taskId: element['task_id'],
-          taskName: element['task_name'].toString().obs,
-          dueDateTime:
-              DateTime.fromMillisecondsSinceEpoch(element['due_timestamp']).obs,
-          remindDateTime:
-              DateTime.fromMillisecondsSinceEpoch(element['remind_timestamp'])
-                  .obs,
-          isCompleted:
-              element['completed'] == false || element['completed'] == 0
-                  ? false.obs
-                  : true.obs,
-          isStrongReminder: element['strong_reminder'] == false ||
-                  element['strong_reminder'] == 0
-              ? false.obs
-              : true.obs,
-        ),
-      );
-    }
+    taskController.allTasks.add(
+      Tasks(
+        taskId: element['task_id'],
+        taskName: element['task_name'].toString().obs,
+        dueDateTime:
+            DateTime.fromMillisecondsSinceEpoch(element['due_timestamp']).obs,
+        remindDateTime:
+            DateTime.fromMillisecondsSinceEpoch(element['remind_timestamp'])
+                .obs,
+        isCompleted: element['completed'] == false || element['completed'] == 0
+            ? false.obs
+            : true.obs,
+        isStrongReminder: element['strong_reminder'] == false ||
+                element['strong_reminder'] == 0
+            ? false.obs
+            : true.obs,
+      ),
+    );
   }
+  runApp(const MyApp());
 
+  await AwesomeNotifications().initialize(null, [
+    NotificationChannel(
+      channelKey: 'reminder',
+      channelName: 'reminder',
+      channelGroupKey: 'reminder_group',
+      channelDescription: 'Reminder of tasks',
+      importance: NotificationImportance.High,
+      enableVibration: true,
+      criticalAlerts: true,
+    )
+  ], channelGroups: [
+    NotificationChannelGroup(
+        channelGroupKey: 'reminder_group', channelGroupName: 'Reminder Group')
+  ]);
   FlutterNativeSplash.remove();
+  bool isAllowedToSendNotification =
+      await AwesomeNotifications().isNotificationAllowed();
+
+  if (!isAllowedToSendNotification) {
+    await AwesomeNotifications().requestPermissionToSendNotifications();
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -93,14 +113,38 @@ class _HomePageState extends State<HomePage> {
   TaskController taskController = Get.put(TaskController());
 
   @override
+  void initState() {
+    AwesomeNotifications().setListeners(
+        onActionReceivedMethod: NotificationController.onActionReceivedMethod,
+        onNotificationDisplayedMethod:
+            NotificationController.onNotificationDisplayedMethod,
+        onNotificationCreatedMethod:
+            NotificationController.onNotificationCreatedMethod,
+        onDismissActionReceivedMethod:
+            NotificationController.onDismissActionReceivedMethod);
+
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xfff7f8fa),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
+          // String localTimeZone =
+          //     await AwesomeNotifications().getLocalTimeZoneIdentifier();
+
           Tasks? resp = await showAddTaskSheet();
           if (resp != null) {
             taskController.allTasks.add(resp);
+
+            addNotification(
+                taskId: resp.taskId,
+                taskName: resp.taskName.value,
+                dueDateTime: resp.dueDateTime.value,
+                remindDateTime: resp.remindDateTime.value,
+                isStrongReminder: resp.isStrongReminder.value);
           }
         },
         backgroundColor: const Color(0xff171717),
@@ -118,8 +162,33 @@ class _HomePageState extends State<HomePage> {
         taskController.allTasks
             .sort((a, b) => a.dueDateTime.value.compareTo(b.dueDateTime.value));
 
-        Map<DateTime, List<Tasks>> groupedTasks =
-            groupBy(taskController.allTasks, (Tasks obj) {
+        // Remove Overdue tasks from the original list based on the yesterday
+
+        taskController.overDueTasks = RxList.from(taskController.allTasks
+            .where((el) => el.dueDateTime.value.isBefore(DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month,
+                  DateTime.now().day,
+                  0,
+                  0,
+                  0,
+                  0,
+                ))));
+        // Create a new list for only new tasks, coming ahead
+
+        taskController.comingTasks = RxList.from(taskController.allTasks
+            .where((el) => el.dueDateTime.value.isAfter(DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month,
+                  DateTime.now().day,
+                  0,
+                  0,
+                  0,
+                  0,
+                ))));
+
+        Map<DateTime, List<Tasks>> comingGroupedTasks =
+            groupBy(taskController.comingTasks, (Tasks obj) {
           return DateTime(
             obj.dueDateTime.value.year,
             obj.dueDateTime.value.month,
@@ -132,7 +201,21 @@ class _HomePageState extends State<HomePage> {
           );
         });
 
-        return groupedTasks.isEmpty
+        Map<DateTime, List<Tasks>> overDueGroupedTasks =
+            groupBy(taskController.overDueTasks, (Tasks obj) {
+          return DateTime(
+            obj.dueDateTime.value.year,
+            obj.dueDateTime.value.month,
+            obj.dueDateTime.value.day,
+            0,
+            0,
+            0,
+            0,
+            0,
+          );
+        });
+
+        return taskController.allTasks.isEmpty
             ? Container(
                 margin: const EdgeInsets.symmetric(vertical: 24),
                 height: Get.height * .85,
@@ -167,60 +250,104 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               )
-            : ListView.builder(
-                shrinkWrap: true,
+            : SingleChildScrollView(
                 scrollDirection: Axis.vertical,
-                itemCount: groupedTasks.length,
-                itemBuilder: (context, index) {
-                  final date = groupedTasks.keys.elementAt(index);
-                  final groupedList = groupedTasks[date]!;
+                child: Column(
+                  children: [
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      scrollDirection: Axis.vertical,
+                      itemCount: overDueGroupedTasks.length,
+                      itemBuilder: (context, index) {
+                        final date = overDueGroupedTasks.keys.elementAt(index);
+                        final groupedList = overDueGroupedTasks[date]!;
 
-                  return ListTile(
-                    title: Text(
-                      date ==
-                              DateTime(
-                                DateTime.now().year,
-                                DateTime.now().month,
-                                DateTime.now().day,
-                                0,
-                                0,
-                                0,
-                                0,
-                              )
-                          ? 'Today'
-                          : date ==
-                                  DateTime(
-                                    DateTime.now().year,
-                                    DateTime.now().month,
-                                    DateTime.now().day + 1,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                  )
-                              ? 'Tomorrow'
-                              : DateFormat('MMM dd, yyyy').format(date),
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ).marginOnly(bottom: 12, left: 24, right: 24),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: groupedList
-                          .map((obj) => TaskItem(
-                                taskId: obj.taskId,
-                                dueDateTime: obj.dueDateTime,
-                                isCompleted: obj.isCompleted,
-                                isStrongReminder: obj.isStrongReminder,
-                                remindDateTime: obj.remindDateTime,
-                                taskName: obj.taskName,
-                              ))
-                          .toList(),
+                        return ListTile(
+                          title: const Text(
+                            'Overdue',
+                            style: TextStyle(
+                              fontSize: 32,
+                              color: Color(0xffc61f1f),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ).marginOnly(bottom: 12, left: 24, right: 24),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: groupedList
+                                .map((obj) => TaskItem(
+                                      taskId: obj.taskId,
+                                      dueDateTime: obj.dueDateTime,
+                                      isCompleted: obj.isCompleted,
+                                      isStrongReminder: obj.isStrongReminder,
+                                      remindDateTime: obj.remindDateTime,
+                                      taskName: obj.taskName,
+                                    ))
+                                .toList(),
+                          ),
+                        );
+                      },
+                    ).paddingOnly(
+                      top: 24,
                     ),
-                  );
-                },
-              ).paddingSymmetric(vertical: 24);
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      scrollDirection: Axis.vertical,
+                      itemCount: comingGroupedTasks.length,
+                      itemBuilder: (context, index) {
+                        final date = comingGroupedTasks.keys.elementAt(index);
+                        final groupedList = comingGroupedTasks[date]!;
+
+                        return ListTile(
+                          title: Text(
+                            date ==
+                                    DateTime(
+                                      DateTime.now().year,
+                                      DateTime.now().month,
+                                      DateTime.now().day,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                    )
+                                ? 'Today'
+                                : date ==
+                                        DateTime(
+                                          DateTime.now().year,
+                                          DateTime.now().month,
+                                          DateTime.now().day + 1,
+                                          0,
+                                          0,
+                                          0,
+                                          0,
+                                        )
+                                    ? 'Tomorrow'
+                                    : DateFormat('MMM dd, yyyy').format(date),
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ).marginOnly(bottom: 12, left: 24, right: 24),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: groupedList
+                                .map((obj) => TaskItem(
+                                      taskId: obj.taskId,
+                                      dueDateTime: obj.dueDateTime,
+                                      isCompleted: obj.isCompleted,
+                                      isStrongReminder: obj.isStrongReminder,
+                                      remindDateTime: obj.remindDateTime,
+                                      taskName: obj.taskName,
+                                    ))
+                                .toList(),
+                          ),
+                        );
+                      },
+                    ).paddingOnly(bottom: 24)
+                  ],
+                ),
+              );
       })),
     );
   }
@@ -282,6 +409,15 @@ class TaskItem extends StatelessWidget {
                     await database.rawUpdate(
                         'UPDATE tasks SET completed = ? WHERE task_id = $taskId',
                         [v! ? 1 : 0]);
+
+                    v
+                        ? deleteNotification(taskId: taskId)
+                        : addNotification(
+                            taskId: taskId,
+                            taskName: taskName.value,
+                            dueDateTime: dueDateTime.value,
+                            remindDateTime: remindDateTime.value,
+                            isStrongReminder: isStrongReminder.value);
                   },
                   visualDensity: VisualDensity.comfortable,
                 )),
@@ -335,16 +471,35 @@ class TaskItem extends StatelessWidget {
                                   size: 14,
                                 ).marginOnly(left: 4, right: 4),
                           Text(
-                            dueDateTime.value
-                                        .difference(DateTime.now())
-                                        .inDays ==
-                                    0
-                                ? 'Tomorrow'
-                                : 'in ${dueDateTime.value.difference(DateTime.now()).inDays} ${dueDateTime.value.difference(DateTime.now()).inDays > 1 ? 'days' : 'day'}',
-                            style: const TextStyle(
+                            isCompleted.value
+                                ? 'Completed'
+                                : dueDateTime.value
+                                            .difference(DateTime.now())
+                                            .inDays <
+                                        0
+                                    ? 'Overdue'
+                                    : dueDateTime.value
+                                                .difference(DateTime.now())
+                                                .inDays ==
+                                            0
+                                        ? 'Today'
+                                        : dueDateTime.value
+                                                    .difference(DateTime.now())
+                                                    .inDays ==
+                                                1
+                                            ? 'Tomorrow'
+                                            : 'in ${dueDateTime.value.difference(DateTime.now()).inDays} ${dueDateTime.value.difference(DateTime.now()).inDays > 1 ? 'days' : 'day'}',
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xffa3a3a3),
+                              color: isCompleted.value
+                                  ? const Color(0xffa3a3a3)
+                                  : dueDateTime.value
+                                              .difference(DateTime.now())
+                                              .inDays <
+                                          0
+                                      ? const Color(0xffc61f1f)
+                                      : const Color(0xffa3a3a3),
                             ),
                           )
                         ],

@@ -1,7 +1,9 @@
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:todolist/main.dart';
+import 'package:todolist/notification_controller.dart';
 
 import '../tasks_model.dart';
 import 'bottolsheetcompoentnts.dart';
@@ -163,6 +165,11 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                                           border: OutlineInputBorder(
                                             borderSide: BorderSide(
                                               color: Color(0xff737373),
+                                            ),
+                                          ),
+                                          errorBorder: OutlineInputBorder(
+                                            borderSide: BorderSide(
+                                              color: Color(0xffc61f1f),
                                             ),
                                           ),
                                           focusedBorder: OutlineInputBorder(
@@ -369,35 +376,35 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                             const SizedBox(
                               height: 24,
                             ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const SizedBox(
-                                  width: 150,
-                                  child: Text(
-                                    'Strong Reminder',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Obx(
-                                  () => Switch(
-                                    activeColor: const Color(0xff007aff),
-                                    activeTrackColor:
-                                        const Color(0xff007aff).withOpacity(.3),
-                                    inactiveThumbColor: const Color(0xff737373),
-                                    inactiveTrackColor: const Color(0xfff7f8fa),
-                                    value: strongReminder.value,
-                                    onChanged: (value) =>
-                                        strongReminder.toggle(),
-                                  ),
-                                ),
-                              ],
-                            ).marginSymmetric(
-                              horizontal: 24,
-                            ),
+                            // Row(
+                            //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            //   children: [
+                            //     const SizedBox(
+                            //       width: 150,
+                            //       child: Text(
+                            //         'Strong Reminder',
+                            //         style: TextStyle(
+                            //           fontSize: 18,
+                            //           fontWeight: FontWeight.w600,
+                            //         ),
+                            //       ),
+                            //     ),
+                            //     Obx(
+                            //       () => Switch(
+                            //         activeColor: const Color(0xff007aff),
+                            //         activeTrackColor:
+                            //             const Color(0xff007aff).withOpacity(.3),
+                            //         inactiveThumbColor: const Color(0xff737373),
+                            //         inactiveTrackColor: const Color(0xfff7f8fa),
+                            //         value: strongReminder.value,
+                            //         onChanged: (value) =>
+                            //             strongReminder.toggle(),
+                            //       ),
+                            //     ),
+                            //   ],
+                            // ).marginSymmetric(
+                            //   horizontal: 24,
+                            // ),
                             const SizedBox(
                               height: 24,
                             ),
@@ -456,6 +463,14 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                                             remindDateTime: remindDate.obs,
                                             isCompleted: false.obs,
                                             isStrongReminder: strongReminder));
+                                        deleteNotification(taskId: id);
+                                        addNotification(
+                                            taskId: id,
+                                            taskName: newTaskName,
+                                            dueDateTime: newDate,
+                                            remindDateTime: remindDate,
+                                            isStrongReminder:
+                                                strongReminder.value);
 
                                         Get.back();
                                       }
@@ -510,6 +525,15 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                                                 element.taskId == tasks.taskId)
                                             .isCompleted
                                             .value = false;
+                                        addNotification(
+                                            taskId: tasks.taskId,
+                                            taskName: tasks.taskName.value,
+                                            dueDateTime:
+                                                tasks.dueDateTime.value,
+                                            remindDateTime:
+                                                tasks.remindDateTime.value,
+                                            isStrongReminder:
+                                                tasks.isStrongReminder.value);
                                       } else {
                                         await database.rawUpdate(
                                             'UPDATE tasks SET completed = ? WHERE task_id = ${tasks.taskId}',
@@ -522,6 +546,8 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                                                 element.taskId == tasks.taskId)
                                             .isCompleted
                                             .value = true;
+                                        deleteNotification(
+                                            taskId: tasks.taskId);
                                       }
                                     },
                                     focusColor: Colors.transparent,
@@ -566,7 +592,7 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                                               ),
                                               Obx(() => Text(
                                                     tasks.isCompleted.value
-                                                        ? 'ReOpen'
+                                                        ? 'Re Open'
                                                         : 'Complete',
                                                     style: const TextStyle(
                                                         color: Colors.white,
@@ -581,7 +607,7 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                                 )
                               ],
                             ).marginSymmetric(horizontal: 24),
-                            SizedBox(
+                            const SizedBox(
                               height: 24,
                             ),
                             Row(
@@ -590,29 +616,17 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                                 Expanded(
                                   child: InkWell(
                                     onTap: () async {
-                                      if (tasks.isCompleted.value) {
-                                        await database.rawUpdate(
-                                            'UPDATE tasks SET completed = ? WHERE task_id = ${tasks.taskId}',
-                                            [0]);
-                                        tasks.isCompleted.value = true;
-                                        Get.back();
+                                      await database.rawDelete(
+                                          'DELETE FROM tasks WHERE task_id = ?',
+                                          [tasks.taskId]);
+                                      tasks.isCompleted.value = true;
 
-                                        taskController.allTasks
-                                            .firstWhere((element) =>
-                                                element.taskId == tasks.taskId)
-                                            .isCompleted
-                                            .value = false;
-                                      } else {
-                                        await database.rawDelete(
-                                            'DELETE FROM tasks WHERE task_id = ?',
-                                            [tasks.taskId]);
-                                        tasks.isCompleted.value = true;
+                                      taskController.allTasks.removeWhere(
+                                          (element) =>
+                                              element.taskId == tasks.taskId);
+                                      deleteNotification(taskId: tasks.taskId);
 
-                                        taskController.allTasks.removeWhere(
-                                            (element) =>
-                                                element.taskId == tasks.taskId);
-                                        Get.back();
-                                      }
+                                      Get.back();
                                     },
                                     focusColor: Colors.transparent,
                                     hoverColor: Colors.transparent,
@@ -621,8 +635,7 @@ showPreviewTaskSheet({required Tasks tasks, required taskController}) {
                                     child: Container(
                                       alignment: AlignmentDirectional.center,
                                       decoration: BoxDecoration(
-                                          color: const Color.fromARGB(
-                                              255, 225, 18, 18),
+                                          color: const Color(0xffc61f1f),
                                           borderRadius:
                                               BorderRadius.circular(16)),
                                       padding: const EdgeInsets.symmetric(

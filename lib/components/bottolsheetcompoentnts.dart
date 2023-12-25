@@ -138,6 +138,11 @@ showAddTaskSheet() {
                                           color: Color(0xff007aff),
                                         ),
                                       ),
+                                      errorBorder: OutlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: Color(0xffc61f1f),
+                                        ),
+                                      ),
                                       hintStyle: TextStyle(
                                         fontSize: 16,
                                         color: Color(0xff737373),
@@ -315,34 +320,34 @@ showAddTaskSheet() {
                     const SizedBox(
                       height: 24,
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const SizedBox(
-                          width: 150,
-                          child: Text(
-                            'Strong Reminder',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        Obx(
-                          () => Switch(
-                            activeColor: const Color(0xff007aff),
-                            activeTrackColor:
-                                const Color(0xff007aff).withOpacity(.3),
-                            inactiveThumbColor: const Color(0xff737373),
-                            inactiveTrackColor: const Color(0xfff7f8fa),
-                            value: strongReminder.value,
-                            onChanged: (value) => strongReminder.toggle(),
-                          ),
-                        ),
-                      ],
-                    ).marginSymmetric(
-                      horizontal: 24,
-                    ),
+                    // Row(
+                    //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    //   children: [
+                    //     const SizedBox(
+                    //       width: 150,
+                    //       child: Text(
+                    //         'Strong Reminder',
+                    //         style: TextStyle(
+                    //           fontSize: 18,
+                    //           fontWeight: FontWeight.w600,
+                    //         ),
+                    //       ),
+                    //     ),
+                    //     Obx(
+                    //       () => Switch(
+                    //         activeColor: const Color(0xff007aff),
+                    //         activeTrackColor:
+                    //             const Color(0xff007aff).withOpacity(.3),
+                    //         inactiveThumbColor: const Color(0xff737373),
+                    //         inactiveTrackColor: const Color(0xfff7f8fa),
+                    //         value: strongReminder.value,
+                    //         onChanged: (value) => strongReminder.toggle(),
+                    //       ),
+                    //     ),
+                    //   ],
+                    // ).marginSymmetric(
+                    //   horizontal: 24,
+                    // ),
                     const SizedBox(
                       height: 24,
                     ),
@@ -367,18 +372,20 @@ showAddTaskSheet() {
                                   0,
                                   0,
                                 );
+                                DateTime remindDate;
                                 DateTime tempDate = newDate;
                                 if (remindMeBefore.value ==
                                     RemindMeBefore.fiveMinutes) {
-                                  tempDate.subtract(const Duration(minutes: 5));
+                                  remindDate = tempDate
+                                      .subtract(const Duration(minutes: 5));
                                 } else if (remindMeBefore.value ==
                                     RemindMeBefore.fiveMinutes) {
-                                  tempDate
+                                  remindDate = tempDate
                                       .subtract(const Duration(minutes: 15));
                                 } else {
-                                  tempDate.subtract(const Duration(hours: 1));
+                                  remindDate = tempDate
+                                      .subtract(const Duration(hours: 1));
                                 }
-                                DateTime remindDate = tempDate;
 
                                 await database.transaction((txn) async {
                                   int id1 = await txn.rawInsert(
