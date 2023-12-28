@@ -1,4 +1,12 @@
+import 'dart:convert';
+
 import 'package:get/get.dart';
+
+List<Tasks> tasksFromMap(String str) =>
+    List<Tasks>.from(json.decode(str).map((x) => Tasks.fromMap(x)));
+
+String tasksToMap(List<Tasks> data) =>
+    json.encode(List<dynamic>.from(data.map((x) => x.toMap())));
 
 class Tasks {
   int taskId;
@@ -18,15 +26,19 @@ class Tasks {
   });
 
   factory Tasks.fromMap(Map<String, dynamic> map) {
+    String tempName = map['task_name'];
+
+    bool tempComp = map['completed'] == 0 ? false : true;
+    bool tempStrRemin = map['strong_reminder'] == 0 ? false : true;
     return Tasks(
       taskId: map['task_id'],
-      taskName: map['task_name'],
+      taskName: tempName.obs,
       dueDateTime:
           DateTime.fromMillisecondsSinceEpoch(map['due_timestamp']).obs,
       remindDateTime:
           DateTime.fromMillisecondsSinceEpoch(map['remind_timestamp']).obs,
-      isCompleted: map['completed'],
-      isStrongReminder: map['strong_reminder'],
+      isCompleted: tempComp.obs,
+      isStrongReminder: tempStrRemin.obs,
     );
   }
 

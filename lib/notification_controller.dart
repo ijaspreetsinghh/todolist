@@ -5,9 +5,7 @@ import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:todolist/controllers.dart';
 import 'package:todolist/main.dart';
-import 'package:sqflite/sqflite.dart';
 
 class NotificationController {
   @pragma("vm:entry-point")
@@ -55,7 +53,7 @@ class NotificationController {
     // Navigate into pages, avoiding to open the notification details page twice
     // In case youre using some state management, such as GetX or get_route, use them to get the valid context instead
     // of using the Flutter's navigator key
-    Get.to(HomePage());
+    Get.to(const HomePage());
   }
 }
 
@@ -66,10 +64,6 @@ addNotification({
   required DateTime remindDateTime,
   required bool isStrongReminder,
 }) async {
-  String localTimeZone =
-      await AwesomeNotifications().getLocalTimeZoneIdentifier();
-  String utcTimeZone =
-      await AwesomeNotifications().getLocalTimeZoneIdentifier();
   AwesomeNotifications().createNotification(
     content: NotificationContent(
       id: taskId,
