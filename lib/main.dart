@@ -30,15 +30,14 @@ void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-  TaskController taskController = Get.put(TaskController());
-  await initializeDatabase();
 
+  await initializeDatabase();
+  TaskController taskController = Get.put(TaskController());
   taskController.allTasks = <Tasks>[].obs;
   // taskController.overDueTasks.clear();
   // taskController.comingTasks.clear();
   List<Map> list = await database.rawQuery('SELECT * FROM tasks');
   taskController.allTasks = tasksFromMap(jsonEncode(list)).obs;
-  runApp(const MyApp());
 
   await AwesomeNotifications().initialize(null, [
     NotificationChannel(
@@ -55,6 +54,7 @@ void main() async {
         channelGroupKey: 'reminder_group', channelGroupName: 'Reminder Group')
   ]);
   FlutterNativeSplash.remove();
+  runApp(const MyApp());
   bool isAllowedToSendNotification =
       await AwesomeNotifications().isNotificationAllowed();
 
